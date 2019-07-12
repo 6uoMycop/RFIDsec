@@ -5,7 +5,6 @@ int worker(
     int                      iNodeNum, 
     int                      iNodesQuantity, 
     Messenger*               messenger, 
-    /*Node* thisNode,*/ // works wrong
     SYNCHRONIZATION_BARRIER* pBar, 
     std::mutex*              pMutStdout
 )
@@ -96,15 +95,12 @@ Node::Node(int iNodeNum, int iNodesNumber, std::mutex* pMutStdout, SYNCHRONIZATI
 
     messengerInstance = new Messenger(cPipeName, iNodesNumber);
     
-    pNodeThread = new std::thread(worker, iNodeNumber, iNodesNumber, messengerInstance, /*this,*/ pBarrier, mutStdout);
+    pNodeThread = new std::thread(worker, iNodeNumber, iNodesNumber, messengerInstance, pBarrier, mutStdout);
 }
 
 
 Node::~Node()
 {
-    //delete messengerInstance;
-    //messengerInstance->~Messenger();
-    //TODO close pipe handles (maybe in core.cpp)
 }
 
 void Node::start()
@@ -123,19 +119,3 @@ void Node::GetPipeName(char* pipeName)
         exit(-3);
     }
 }
-
-//void Node::enterBarrier(LPSYNCHRONIZATION_BARRIER pBarr)
-//{
-//    EnterSynchronizationBarrier(
-//        pBarr,
-//        SYNCHRONIZATION_BARRIER_FLAGS_BLOCK_ONLY
-//    );
-//}
-//
-//void Node::safePrint(const char* str)
-//{
-//    mutStdout->lock();
-//    std::cout << str << std::endl;
-//    mutStdout->unlock();
-//}
-

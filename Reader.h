@@ -21,18 +21,18 @@ public:
 
     ~Reader();
 
+    //
+    // thread->join();
+    //
     void start();
 
-    Messenger* messengerInstance;
+    Messenger* messengerInstance; // Messenger to perform communication
 
 private:
 
-    std::thread* pReaderThread;                                    // Pointer to the reader's thread
-
-    char         cPipeName[64] = "\\\\.\\pipe\\RFIDsecPipeReader"; // Pipe name
-    HANDLE       hPipe;                                            // Pipe handle
-
-    std::mutex*  mutStdout;                                        // Pointer to mutex for access to console output 
+    std::thread*              pReaderThread;                                    // Pointer to the reader's thread
+    char                      cPipeName[64] = "\\\\.\\pipe\\RFIDsecPipeReader"; // Pipe name
+    std::mutex*               mutStdout;                                        // Pointer to mutex for access to console output 
     LPSYNCHRONIZATION_BARRIER pBarrier;
 
 };

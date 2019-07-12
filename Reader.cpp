@@ -3,7 +3,6 @@
 int worker(
     int                      iNodesNumber,
     Messenger*               messenger,
-    /*Reader*                  thisReader,*/
     std::mutex*              pMutStdout,
     SYNCHRONIZATION_BARRIER* pBar
 )
@@ -27,7 +26,7 @@ Reader::Reader(int iNodesNumber, std::mutex* pMutStdout, SYNCHRONIZATION_BARRIER
 
     messengerInstance = new Messenger(cPipeName, iNodesNumber);
 
-    pReaderThread = new std::thread(worker, iNodesNumber, messengerInstance, /*this,*/ mutStdout, pBar);
+    pReaderThread = new std::thread(worker, iNodesNumber, messengerInstance, mutStdout, pBar);
 }
 
 Reader::~Reader()

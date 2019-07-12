@@ -20,8 +20,7 @@ public:
 private:
     
     std::vector<Node> vNodes; // Vector of all nodes
-
-    Reader* reader;           // reader
+    Reader*           reader; // reader
 
 };
 
