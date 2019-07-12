@@ -4,45 +4,60 @@
 // Main listener's routine
 //
 void listenerMainWorker(
-    HANDLE*                          hListenerPipe, // 
-    std::vector<std::list<Message>>* vectMessages,  // 
-    std::deque<std::mutex>* qMutexes
+    HANDLE*                          hListenerPipe,
+    std::vector<std::list<Message>>* vectMessages, 
+    std::deque<std::mutex>*          qMutexes,
+    std::list<Message>*              listReaderMessages,
+    std::mutex*                      mutReaderMessages
 );
 
 //
 // Listener for one client
 //
 void subListenerWorker(
-    HANDLE*                          hListenerPipe, // 
-    std::vector<std::list<Message>>* vectMessages,  // 
-    std::deque<std::mutex>*          qMutexes
+    HANDLE*                          hListenerPipe,
+    std::vector<std::list<Message>>* vectMessages, 
+    std::deque<std::mutex>*          qMutexes,
+    std::list<Message>*              listReaderMessages,
+    std::mutex*                      mutReaderMessages
 );
 
-void listenerMainWorker(HANDLE* hListenerPipe, std::vector<std::list<Message>>* vectMessages, std::deque<std::mutex>* qMutexes)
+////////////////////////////////////////////////////////
+
+void listenerMainWorker(
+    HANDLE*                          hListenerPipe,
+    std::vector<std::list<Message>>* vectMessages,
+    std::deque<std::mutex>*          qMutexes,
+    std::list<Message>*              listReaderMessages,
+    std::mutex*                      mutReaderMessages
+)
 {
     BOOL   fConnected = FALSE;
 
     while (true)
     {
-        // Wait for the client to connect; if it succeeds, 
-        // the function returns a nonzero value. If the function
-        // returns zero, GetLastError returns ERROR_PIPE_CONNECTED. 
-
+        // Wait for the client to connect; if it succeeds, the function returns a nonzero value.
+        // If the function returns zero, GetLastError returns ERROR_PIPE_CONNECTED. 
         fConnected = ConnectNamedPipe(*hListenerPipe, NULL) ?
             TRUE :
             (GetLastError() == ERROR_PIPE_CONNECTED);
 
         if (fConnected)
         {
-            // Create a thread for this client. 
-            //listThreads.push_back(new std::thread(&Messenger::subListenerWorker));
-            std::thread* tmp = new std::thread(subListenerWorker, hListenerPipe, vectMessages, qMutexes);
+            // Create a thread for this client
+            std::thread* tmp = new std::thread(subListenerWorker, hListenerPipe, vectMessages, qMutexes, listReaderMessages, mutReaderMessages);
             tmp->detach();
         }
     }
 }
 
-void subListenerWorker(HANDLE* hListenerPipe, std::vector<std::list<Message>>* vectMessages, std::deque<std::mutex>* qMutexes)
+void subListenerWorker(
+    HANDLE*                          hListenerPipe,
+    std::vector<std::list<Message>>* vectMessages,
+    std::deque<std::mutex>*          qMutexes,
+    std::list<Message>*              listReaderMessages,
+    std::mutex*                      mutReaderMessages
+)
 {
     DWORD cbBytesRead = 0, cbReplyBytes = 0, cbWritten = 0;
     char cRequest[PIPE_BUFFER_SIZE];
@@ -53,23 +68,37 @@ void subListenerWorker(HANDLE* hListenerPipe, std::vector<std::list<Message>>* v
         // Read client requests from the pipe. This simplistic code only allows messages
         // up to BUFSIZE characters in length.
         fSuccess = ReadFile(
-            *hListenerPipe,            // handle to pipe 
+            *hListenerPipe,   // handle to pipe 
             cRequest,         // buffer to receive data 
             PIPE_BUFFER_SIZE, // size of buffer 
             &cbBytesRead,     // number of bytes read 
-            NULL);            // not overlapped I/O
-    } while (!fSuccess);  // repeat loop if ERROR_MORE_DATA 
+            NULL            // not overlapped I/O
+        );
+    } while (!fSuccess); // repeat loop if ERROR_MORE_DATA 
+
+    //printf("%04X\n", *hListenerPipe);
 
     Message msg((void*)cRequest);
     
-    (*qMutexes)[msg.GetSender()].lock();
-    (*vectMessages)[msg.GetSender()].push_back(msg);
-    (*qMutexes)[msg.GetSender()].unlock();
-
+    if (msg.GetSender() == -1) // From reader
+    {
+        (*mutReaderMessages).lock();
+        (*listReaderMessages).push_back(msg);
+        (*mutReaderMessages).unlock();
+    }
+    else
+    {
+        (*qMutexes)[msg.GetSender()].lock();
+        (*vectMessages)[msg.GetSender()].push_back(msg);
+        (*qMutexes)[msg.GetSender()].unlock();
+    }
 }
 
 
-Messenger::Messenger(const char* cPipeName, int iNodesNum)
+Messenger::Messenger(
+    const char* cPipeName, 
+    int         iNodesNum
+)
 {
     hPipe = CreateNamedPipe(
         (const char*)cPipeName,   // pipe name 
@@ -88,6 +117,7 @@ Messenger::Messenger(const char* cPipeName, int iNodesNum)
         printf("CreateNamedPipe failed, GLE=%d.\n", GetLastError());
     }
 
+    //printf("%s %04X\n", &cPipeName[20], hPipe);
 
     iNodesNumber = iNodesNum;
     for (int i = 0; i < iNodesNumber; i++)
@@ -111,7 +141,7 @@ Messenger::Messenger(const char* cPipeName, int iNodesNum)
     //    0,              // default attributes 
     //    NULL);          // no template file 
 
-    pListenerThread = new std::thread(listenerMainWorker, &hPipe, &vectRecievedMessages, qMutexes);
+    pListenerThread = new std::thread(listenerMainWorker, &hPipe, &vectRecievedMessages, qMutexes, &listReaderMessages, &mutReaderMessages);
     pListenerThread->detach();
 }
 
@@ -119,18 +149,28 @@ Messenger::~Messenger()
 {
 }
 
-int Messenger::send(Message* msg)
+int Messenger::send(
+    Message* msg
+)
 {
     HANDLE hPipeS;
     char   chBuf[PIPE_BUFFER_SIZE] = { '\0' };
+    char   cPipeName[64] = { '\0' };
     BOOL   fSuccess = FALSE;
     DWORD  cbToWrite, cbWritten, dwMode;
 
-    char cPipeName[64] = "\\\\.\\pipe\\RFIDsecPipe"; // Pipe name in format: \\.\pipe\RFIDsecPipe< Number of this node >
-    _itoa(msg->GetReciever(), &cPipeName[20], 10);
+
+    if (msg->GetReciever() == -1) // reader's ID
+    {
+        memcpy(cPipeName, "\\\\.\\pipe\\RFIDsecPipeReader", 26);
+    }
+    else
+    {
+        memcpy(cPipeName, "\\\\.\\pipe\\RFIDsecPipe", 20); // Pipe name in format: \\.\pipe\RFIDsecPipe< Number of this node >
+        _itoa(msg->GetReciever(), &cPipeName[20], 10);
+    }
 
     // Try to open a named pipe; wait for it, if necessary. 
-
     while (1)
     {
         hPipeS = CreateFile(
@@ -201,60 +241,43 @@ int Messenger::send(Message* msg)
     printf("\nMessage sent to %s\n", cPipeName);
 
     CloseHandle(hPipeS);
-
     return 0;
 }
 
-int Messenger::recv(int iFrom, Message* msg)
+int Messenger::recv(
+    int      iFrom, 
+    Message* msg
+)
 {
     bool bEmpty = true;
+    
+    std::mutex*         pMut      = ((iFrom == -1) ? &mutReaderMessages  : &(*qMutexes)[iFrom]          ); // Mutex to use
+    std::list<Message>* pMessages = ((iFrom == -1) ? &listReaderMessages : &vectRecievedMessages[iFrom] ); // List of messages to use
 
     for (int i = 0; i < RECV_MAX_WAIT; i++)
     {
-        (*qMutexes)[iFrom].lock();
+        pMut->lock();
         //v
-        bEmpty = vectRecievedMessages[iFrom].empty();
+        bEmpty = pMessages->empty();
         //^
-        (*qMutexes)[iFrom].unlock();
+        pMut->unlock();
 
         if (!bEmpty)
         {
-            (*qMutexes)[iFrom].lock();
+            pMut->lock();
             //v
-            *msg = vectRecievedMessages[iFrom].front();
-            vectRecievedMessages[iFrom].pop_front();
+            *msg = pMessages->front();
+            pMessages->pop_front();
             //^
-            (*qMutexes)[iFrom].unlock();
+            pMut->unlock();
 
-            return 0;
+            return 0; // Message was recieved
         }
         else
         {
-            printf("...\n");
             Sleep(RECV_SLEEP_TIME);
         }
     }
-
-    msg = nullptr;
-
-    printf("TIMEOUT\n");
-    return -1;
-
-
-    //(*qMutexes)[iFrom].lock();
-    //if (!vectRecievedMessages[iFrom].empty())
-    //{
-    //    *msg = vectRecievedMessages[iFrom].front();
-    //    vectRecievedMessages[iFrom].pop_front();
-    //
-    //    (*qMutexes)[iFrom].unlock();
-    //    return 0;
-    //}
-    //else
-    //{
-    //    msg = nullptr;
-    //
-    //    (*qMutexes)[iFrom].unlock();
-    //    return -1;
-    //}
+    
+    return -1; // Waiting time is over
 }

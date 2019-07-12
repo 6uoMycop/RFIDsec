@@ -2,6 +2,6 @@
 
 void main()
 {
-    RFIDsecCore Core(2);
+    RFIDsecCore Core(4);
     system("pause");
 }

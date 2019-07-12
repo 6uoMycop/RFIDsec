@@ -7,7 +7,7 @@ RFIDsecCore::RFIDsecCore(int iNumberOfNodes)
 {
     if (!InitializeSynchronizationBarrier(
         &barrier_0,
-        iNumberOfNodes,
+        iNumberOfNodes + 1, // +reader
         0
     ))
     {
@@ -20,11 +20,13 @@ RFIDsecCore::RFIDsecCore(int iNumberOfNodes)
         Node tmp(i, iNumberOfNodes, &mutStdout, &barrier_0);
         vNodes.push_back(tmp);
     }
+    reader = new Reader(iNumberOfNodes, &mutStdout, &barrier_0);
 
     for (int i = 0; i < iNumberOfNodes; i++)
     {
         vNodes[i].start();
     }
+    reader->start();
 }
 
 RFIDsecCore::~RFIDsecCore()

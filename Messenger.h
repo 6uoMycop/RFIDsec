@@ -55,9 +55,13 @@ private:
 
     std::thread* pListenerThread; // Listener's thread
 
+    // For inter-nodes communication
     std::vector< std::list<Message> > vectRecievedMessages; // Here all recieved messages will be stored until they are processed. A vector's component stands for sender node
-
     std::deque< std::mutex >* qMutexes;
+
+    // For communication with reader
+    std::list<Message> listReaderMessages; 
+    std::mutex mutReaderMessages;
 
     int iNodesNumber; // Number of nodes
 

@@ -2,12 +2,12 @@
 
 Message::Message()
 {
-    msgMessage.iSender   = -1;
-    msgMessage.iReciever = -1;
-    msgMessage.iSize     = -1;
+    msgMessage.iSender   = -2;
+    msgMessage.iReciever = -2;
+    msgMessage.iSize     = -2;
 }
 
-Message::Message(int iSenderNode, int iRecieverNode, void* pData, int iSizeOfData)
+Message::Message(int iSenderNode, int iRecieverNode, const void* pData, int iSizeOfData)
 {
     msgMessage.iSender   = iSenderNode;
     msgMessage.iReciever = iRecieverNode;

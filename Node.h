@@ -7,7 +7,9 @@
 #include "Messenger.h"
 #include "defines.h"
 
-
+//
+// Class which describes RFID-tag
+//
 class Node
 {
 public:
@@ -19,17 +21,12 @@ public:
     //
     Node(
         int iNodeNum,
-        int iNudesNumber,
+        int iNodesNumber,
         std::mutex* pMutStdout,
         SYNCHRONIZATION_BARRIER* pBar
     );
 
     ~Node();
-
-    //
-    //
-    //
-    //int init(int nodeArgc, char** nodeArgv[]);
 
     // 
     // Node's main function
@@ -58,7 +55,7 @@ private:
     char         cPipeName[64] = "\\\\.\\pipe\\RFIDsecPipe"; // Pipe name in format: \\.\pipe\RFIDsecPipe< Number of this node >
     //HANDLE       hPipeHandle;
 
-    std::mutex*  mutStdout;   // Pointer to mutex for access to console output 
+    std::mutex*  mutStdout;   // Pointer to mutex for access to console output
     LPSYNCHRONIZATION_BARRIER pBarrier;
 
 

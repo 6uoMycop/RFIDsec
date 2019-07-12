@@ -127,12 +127,14 @@
     <ClInclude Include="Message.h" />
     <ClInclude Include="Messenger.h" />
     <ClInclude Include="Node.h" />
+    <ClInclude Include="Reader.h" />
     <ClInclude Include="RFIDsecCore.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Message.cpp" />
     <ClCompile Include="Messenger.cpp" />
     <ClCompile Include="Node.cpp" />
+    <ClCompile Include="Reader.cpp" />
     <ClCompile Include="RFIDsecCore.cpp" />
     <ClCompile Include="Test.cpp" />
   </ItemGroup>

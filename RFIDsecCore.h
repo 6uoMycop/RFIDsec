@@ -2,6 +2,7 @@
 #include <Windows.h>
 #include <vector>
 #include "Node.h"
+#include "Reader.h"
 
 class RFIDsecCore
 {
@@ -19,6 +20,8 @@ public:
 private:
     
     std::vector<Node> vNodes; // Vector of all nodes
+
+    Reader* reader;           // reader
 
 };
 

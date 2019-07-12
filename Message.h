@@ -30,10 +30,10 @@ public:
     // Create an initialized instance of Message class from all data
     // 
     Message(
-        int   iSenderNode,   // Number of sender node
-        int   iRecieverNode, // Number of reciever node
-        void* pData,         // Pointer to data which will be contained in message
-        int   iSizeOfData    // Size of buffer in bytes
+        int         iSenderNode,   // Number of sender node
+        int         iRecieverNode, // Number of reciever node
+        const void* pData,         // Pointer to data which will be contained in message
+        int         iSizeOfData    // Size of buffer in bytes
     );
 
     // 
