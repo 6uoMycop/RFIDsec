@@ -73,6 +73,8 @@ int adv_worker(
     std::list<int> accepted(3, 0); // list for checking accepted messages in step 3. When a message accepted, number is erased
     std::list<int>::iterator iter = accepted.begin();
     
+#ifdef ADVERSARY
+
     ///
     ///--------------------------------------------------------------------------//
     EnterSynchronizationBarrier(pBar, SYNCHRONIZATION_BARRIER_FLAGS_BLOCK_ONLY); // 0
@@ -230,6 +232,8 @@ int adv_worker(
     EnterSynchronizationBarrier(pBar, SYNCHRONIZATION_BARRIER_FLAGS_BLOCK_ONLY); // LL
     ///--------------------------------------------------------------------------//
     ///
+
+#endif
 
     return 0;
 }

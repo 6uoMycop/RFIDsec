@@ -542,11 +542,13 @@ int Messenger::send(
         memcpy(cPipeName, "\\\\.\\pipe\\RFIDsecPipeReader", 26);
         break;
     }
+#ifdef ADVERSARY
     case ADDR_ADVERSARY: // To adversary
     {
         memcpy(cPipeName, "\\\\.\\pipe\\RFIDsecPipeAdversary", 29);
         break;
     }
+#endif
     default:
     {
         memcpy(cPipeName, "\\\\.\\pipe\\RFIDsecPipe", 20); // Pipe name in format: \\.\pipe\RFIDsecPipe< Number of this node >
