@@ -129,6 +129,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Adversary.h" />
     <ClInclude Include="Crypt.h" />
     <ClInclude Include="Database.h" />
     <ClInclude Include="defines.h" />
@@ -139,6 +140,7 @@
     <ClInclude Include="RFIDsecCore.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Adversary.cpp" />
     <ClCompile Include="Crypt.cpp" />
     <ClCompile Include="Database.cpp" />
     <ClCompile Include="Message.cpp" />

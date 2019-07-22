@@ -33,7 +33,7 @@ public:
 
     void Get_xi(int iTagNum, uint8_t* xi);
     void Get_yi(int iTagNum, uint8_t* yi);
-    void Get_hk(int iTagNum, uint8_t* hk);
+    void Get_hk(uint8_t* hk);
     void Get_M3(int iTagNum, uint8_t* M3);
     void Get_M4(int iTagNum, uint8_t* M4);
 

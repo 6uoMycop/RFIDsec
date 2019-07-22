@@ -248,37 +248,22 @@ int worker(
     SYNCHRONIZATION_BARRIER* pBar
 )
 {
-    //hDLL = LoadLibrary("libcrypto-3.dll"); 
-    //if (hDLL != NULL)
-    //{
-    //    __HMAC = (_HMAC)GetProcAddress(hDLL, "HMAC");
-    //    if (!__HMAC)
-    //    {
-    //        // handle the error  
-    //        FreeLibrary(hDLL);
-    //        return -1;
-    //    }
-    //}
-
     prng_init((0xbad ^ 0xc0ffee ^ 42) | 0xcafebabe | 666);
 
-    
     std::list<int> accepted; // list for checking accepted messages in step 3. When a message accepted, number is erased
+#ifndef ADVERSARY
     for (int i = 0; i < iNodesNumber; i++)
     {
         accepted.push_back(i);
         accepted.push_back(i);
         accepted.push_back(i);
     }
+#else
+    accepted.push_back(ADDR_ADVERSARY);
+    accepted.push_back(ADDR_ADVERSARY);
+    accepted.push_back(ADDR_ADVERSARY);
+#endif
     std::list<int>::iterator iter = accepted.begin();
-
-
-    //EVP_PKEY* key;
-    //unsigned char pass[] = "password";
-    //key = EVP_PKEY_new_mac_key(EVP_PKEY_HMAC, NULL, pass, 9);
-    
-
-
 
     struct stTagData
     {
@@ -299,10 +284,6 @@ int worker(
 
     // initialization
 
-
-    //Sleep(1000);
-
-    //messenger->start();
     ///
     ///--------------------------------------------------------------------------//
     EnterSynchronizationBarrier(pBar, SYNCHRONIZATION_BARRIER_FLAGS_BLOCK_ONLY); // 0
@@ -310,13 +291,12 @@ int worker(
     ///
     
     // init nodes
-    //for (int i = 0; i < iNodesNumber; i++)
-    for (int i = iNodesNumber - 1; i >= 0; i--)
+    for (int i = 0; i < iNodesNumber; i++)
     {
         uint8_t hk[NONCE_LEN * 2];
         uint8_t xi[NONCE_LEN * 2];
         uint8_t yi[NONCE_LEN * 2];
-        DB.Get_hk(i, hk);
+        DB.Get_hk(hk);
         DB.Get_xi(i, xi);
         DB.Get_yi(i, yi);
 
@@ -333,6 +313,13 @@ int worker(
         messenger->send(&msg_init_hk);
     }
 
+#ifdef ADVERSARY
+    uint8_t a_hk[NONCE_LEN * 2];
+    DB.Get_hk(a_hk);
+    Message msg_adv_hk(ADDR_READER, ADDR_ADVERSARY, 12, a_hk, NONCE_LEN * 2 * sizeof(uint8_t)); // ID 12
+    messenger->send(&msg_adv_hk);
+#endif
+
     pMutStdout->lock();
     std::cout << "Reader: init sent" << std::endl;
     pMutStdout->unlock();
@@ -343,20 +330,21 @@ int worker(
     ///--------------------------------------------------------------------------//
     ///
 
+#ifndef ADVERSARY
+
     // 1.
     // 1.1 R generates a random nonce r_1
-    for (int i = 0; i < NONCE_LEN; i++)
+    for (int i = 0; i < iNodesNumber; i++)
     {
-        prng_next();
-        vTagData[i].r1[i] = prng_next();
+        for (int j = 0; j < NONCE_LEN; j++)
+        {
+            prng_next();
+            vTagData[i].r1[j] = prng_next();
+        }
     }
     //  1.2 R sends r_1 to T_i
     for(int i = 0; i < iNodesNumber; i++)
     {
-        ////char cHello[] = "Hello";
-        ////Message hello(-1, i, -100, cHello, strlen(cHello));
-        ////messenger->send(&hello);
-
         Message msg(-1, i, 0, vTagData[i].r1, NONCE_LEN * 2 * sizeof(uint8_t)); // ID 0
         messenger->send(&msg);
     }
@@ -391,17 +379,17 @@ int worker(
         {
         case 1:
         {
-            memcpy(vTagData[*iter].r2, msg.GetData(), NONCE_LEN * 2);
+            memcpy(vTagData[*iter].r2, msg.GetData(), NONCE_LEN * 2 * sizeof(uint8_t));
             break;
         }
         case 2:
         {
-            memcpy(vTagData[*iter].M1, msg.GetData(), NONCE_LEN * 2);
+            memcpy(vTagData[*iter].M1, msg.GetData(), NONCE_LEN * 2 * sizeof(uint8_t));
             break;
         }
         case 3:
         {
-            memcpy(vTagData[*iter].M2, msg.GetData(), NONCE_LEN * 2);
+            memcpy(vTagData[*iter].M2, msg.GetData(), NONCE_LEN * 2 * sizeof(uint8_t));
             break;
         }
         default:
@@ -529,6 +517,113 @@ int worker(
     EnterSynchronizationBarrier(pBar, SYNCHRONIZATION_BARRIER_FLAGS_BLOCK_ONLY); // L
     ///--------------------------------------------------------------------------//
     ///
+
+#else // If ADVERSARY defined
+    uint8_t adv_r1[NONCE_LEN * 2];
+    uint8_t adv_r2[NONCE_LEN * 2];
+    uint8_t adv_M1[NONCE_LEN * 2];
+    uint8_t adv_M2[NONCE_LEN * 2];
+
+    ///
+    ///--------------------------------------------------------------------------//
+    EnterSynchronizationBarrier(pBar, SYNCHRONIZATION_BARRIER_FLAGS_BLOCK_ONLY); // 2
+    ///--------------------------------------------------------------------------//
+    ///
+
+    //Phase 2: The adversary impersonates the tag T_i to the valid server.
+    ///2.1 A initiates a session with R.
+    //2.2 R transmits some random nonce r_1 to A.
+    for (int i = 0; i < NONCE_LEN; i++)
+    {
+        prng_next();
+        adv_r1[i] = prng_next();
+    }
+    Message msg_adv_r1(ADDR_READER, ADDR_ADVERSARY, 0, adv_r1, NONCE_LEN * 2 * sizeof(uint8_t)); // ID 0
+    messenger->send(&msg_adv_r1);
+
+    // ? to DB
+    DB.Set_r1(iNodesNumber, adv_r1);
+
+    //2.3 R recieves response {r_2, M_1, M_2} from A
+    while (!accepted.empty())
+    {
+        Message msg;
+        if (messenger->recv(*iter, &msg) == -1) // ID: 1 - r_2, 2 - M_1, 3 - M_2
+        {
+            continue; // message was not recieved
+        }
+
+        // Handling
+        switch (msg.GetID())
+        {
+        case 1:
+        {
+            memcpy(adv_r2, msg.GetData(), NONCE_LEN * 2 * sizeof(uint8_t));
+            break;
+        }
+        case 2:
+        {
+            memcpy(adv_M1, msg.GetData(), NONCE_LEN * 2 * sizeof(uint8_t));
+            break;
+        }
+        case 3:
+        {
+            memcpy(adv_M2, msg.GetData(), NONCE_LEN * 2 * sizeof(uint8_t));
+            break;
+        }
+        default:
+        {
+            pMutStdout->lock();
+            printf("ERROR\n");
+            pMutStdout->unlock();
+            return -1;
+        }
+        }
+
+        // Deletion
+        iter = accepted.erase(iter);
+        if (iter == accepted.end())
+        {
+            iter = accepted.begin();
+        }
+    }
+
+    //2.4 R delivers {r_2, M_1, M_2} to DB.
+    DB.Set_r2(iNodesNumber, adv_r2);
+    DB.Set_M1(iNodesNumber, adv_M1);
+    DB.Set_M2(iNodesNumber, adv_M2);
+
+    //2.5 DB computes 
+    //        x_i = M_1 xor h(h(k) xor r_2),
+    DB.Compute_xi(iNodesNumber);
+    //        y_i = f_k(x_i).
+    DB.Compute_yi(iNodesNumber);
+
+    //2.6 M_2 = h(y_i xor r_2 xor r_1) is satisfied and DB authenticates A as T_i, because
+    //        h(y_i xor r_2 xor r_1) = h(y_i xor r_1^' xor r_2^' xor r_1 xor r_1) = 
+    //                               = h(y_i xor r_1^' xor r_2^') =
+    //                               = M_2 = M_2^'.
+    if (!DB.Check_M2(iNodesNumber))
+    {
+        pMutStdout->lock();
+        std::cout << "Adversary: DB check M2 error" << std::endl;
+        pMutStdout->unlock();
+    }
+    else
+    {
+        pMutStdout->lock();
+        std::cout << "Adversary: DB check M2 success!" << std::endl;
+        pMutStdout->unlock();
+    }
+
+
+    ///
+    ///--------------------------------------------------------------------------//
+    EnterSynchronizationBarrier(pBar, SYNCHRONIZATION_BARRIER_FLAGS_BLOCK_ONLY); // LL
+    ///--------------------------------------------------------------------------//
+    ///
+
+#endif
 
     pMutStdout->lock();
     std::cout << "Reader off" << std::endl;

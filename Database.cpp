@@ -70,6 +70,10 @@ Database::Database(int iNodesQuantity)
         vData.push_back(tmp);
     }
 
+#ifdef ADVERSARY
+    stData adv_tmp;
+    vData.push_back(adv_tmp);
+#endif
 }
 
 Database::~Database()
@@ -86,7 +90,7 @@ void Database::Get_yi(int iTagNum, uint8_t* yi)
     memcpy(yi, vData[iTagNum].yi, NONCE_LEN * 2 * sizeof uint8_t);
 }
 
-void Database::Get_hk(int iTagNum, uint8_t* _hk)
+void Database::Get_hk(uint8_t* _hk)
 {
     memcpy(_hk, hk, NONCE_LEN * 2 * sizeof uint8_t);
 }

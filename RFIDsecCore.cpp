@@ -3,11 +3,15 @@
 
 
 
-RFIDsecCore::RFIDsecCore(int iNumberOfNodes)
+RFIDsecCore::RFIDsecCore()
 {
     if (!InitializeSynchronizationBarrier(
         &barrier_0,
-        iNumberOfNodes + 1, // +reader
+#ifndef ADVERSARY
+        NODES_QUANTITY + 1, // +reader
+#else
+        NODES_QUANTITY + 1 + 1, // +reader +adversary
+#endif
         0
     ))
     {
@@ -15,12 +19,17 @@ RFIDsecCore::RFIDsecCore(int iNumberOfNodes)
     }
 
 
-    for (int i = 0; i < iNumberOfNodes; i++)
+    for (int i = 0; i < NODES_QUANTITY; i++)
     {
-        Node tmp(i, iNumberOfNodes, &mutStdout, &barrier_0);
+        Node tmp(i, NODES_QUANTITY, &mutStdout, &barrier_0);
         vNodes.push_back(tmp);
     }
-    reader = new Reader(iNumberOfNodes, &mutStdout, &barrier_0);
+    reader = new Reader(NODES_QUANTITY, &mutStdout, &barrier_0);
+
+#ifdef ADVERSARY
+    adversary = new Adversary(NODES_QUANTITY, &mutStdout, &barrier_0);
+    adversary->start();
+#endif
 
     //for (int i = 0; i < iNumberOfNodes; i++)
     //{

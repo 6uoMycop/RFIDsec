@@ -2,7 +2,7 @@
 
 int main()
 {
-    RFIDsecCore Core(20);
+    RFIDsecCore Core;
     system("pause");
     return 0;
 }

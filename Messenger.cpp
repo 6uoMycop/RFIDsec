@@ -501,8 +501,18 @@ Messenger::Messenger(
         std::list<Message> tmp;
         vectRecievedMessages.push_back(tmp);
     }
+#ifdef ADVERSARY
+    std::list<Message> tmp;
+    vectRecievedMessages.push_back(tmp);
+#endif
 
-    qMutexes = new std::deque<std::mutex>(iNodesQuantity);
+    qMutexes = new std::deque<std::mutex>(
+#ifndef ADVERSARY
+        iNodesQuantity
+#else
+        iNodesQuantity + 1
+#endif
+        );
 
     //pListenerThread = new std::thread(listenerMainWorker, &hPipe, &vectRecievedMessages, qMutexes, &listReaderMessages, &mutReaderMessages);
     pListenerThread = new std::thread(listenerMainWorker, cListenerPipeName, &vectRecievedMessages, qMutexes, &listReaderMessages, &mutReaderMessages);
@@ -525,16 +535,26 @@ int Messenger::send(
     DWORD  cbToWrite, cbWritten, dwMode;
     
     
-    if (msg->GetReciever() == -1) // To reader
+    switch (msg->GetReciever())
+    {
+    case ADDR_READER: // To reader
     {
         memcpy(cPipeName, "\\\\.\\pipe\\RFIDsecPipeReader", 26);
+        break;
     }
-    else // To a tag
+    case ADDR_ADVERSARY: // To adversary
+    {
+        memcpy(cPipeName, "\\\\.\\pipe\\RFIDsecPipeAdversary", 29);
+        break;
+    }
+    default:
     {
         memcpy(cPipeName, "\\\\.\\pipe\\RFIDsecPipe", 20); // Pipe name in format: \\.\pipe\RFIDsecPipe< Number of this node >
         _itoa(msg->GetReciever(), &cPipeName[20], 10);
+        break;
     }
-    
+    }
+        
     // Try to open a named pipe; wait for it, if necessary. 
     while (1)
     {
@@ -618,6 +638,7 @@ int Messenger::recv(
     std::mutex*         pMut      = ((iFrom == -1) ? &mutReaderMessages  : &(*qMutexes)[iFrom]          ); // Mutex to use
     std::list<Message>* pMessages = ((iFrom == -1) ? &listReaderMessages : &vectRecievedMessages[iFrom] ); // List of messages to use
 
+
     for (int i = 0; i < RECV_MAX_WAIT; i++)
     {
         pMut->lock();
@@ -629,6 +650,7 @@ int Messenger::recv(
             pMut->lock();
             *msg = pMessages->front();
             pMessages->pop_front();
+            //printf("%i\n", msg->GetID());
             pMut->unlock();
 
             return 0; // Message was recieved
@@ -638,6 +660,6 @@ int Messenger::recv(
             Sleep(RECV_SLEEP_TIME);
         }
     }
-    printf("F");
+    //printf("F");
     return -1; // Waiting time is over. Message was not recieved
 }

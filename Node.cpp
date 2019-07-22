@@ -66,6 +66,7 @@ int worker(
     uint8_t yi[NONCE_LEN * 2]    = { 0 }; //
     uint8_t hk[NONCE_LEN * 2]    = { 0 };
 
+#ifndef ADVERSARY
     uint8_t r1[NONCE_LEN * 2]    = { 0 };
     uint8_t r2[NONCE_LEN * 2]    = { 0 };
     uint8_t M1[NONCE_LEN * 2]    = { 0 };
@@ -74,6 +75,12 @@ int worker(
     uint8_t M4[NONCE_LEN * 2]    = { 0 };
     uint8_t xiNEW[NONCE_LEN * 2] = { 0 };
     uint8_t yiNEW[NONCE_LEN * 2] = { 0 }; //
+#else
+    uint8_t r1_[NONCE_LEN * 2]   = { 0 };
+    uint8_t r2_[NONCE_LEN * 2]   = { 0 };
+    uint8_t M1_[NONCE_LEN * 2]   = { 0 };
+    uint8_t M2_[NONCE_LEN * 2]   = { 0 };
+#endif
 
 
     prng_init((0xbad ^ 0xc0ffee ^ 42) | 0xcafebabe | 666 | ((iNodeNum + 1) ^ 167));
@@ -128,15 +135,13 @@ int worker(
     std::cout << "Tag " << iNodeNum << " init OK" << std::endl;
     pMutStdout->unlock();
 
-    char cHello[] = "Hello";
-    Message hello(iNodeNum, -1, -100, cHello, strlen(cHello));
-    messenger->send(&hello);
-
     ///
     ///--------------------------------------------------------------------------//
     EnterSynchronizationBarrier(pBar, SYNCHRONIZATION_BARRIER_FLAGS_BLOCK_ONLY); // 1
     ///--------------------------------------------------------------------------//
     ///
+
+#ifndef ADVERSARY
         
     //  1.
     /// 1.1 R generates a random nonce r_1
@@ -213,7 +218,7 @@ int worker(
     //////pMutStdout->unlock();
 
 
-    messenger->send(&hello);
+    //messenger->send(&hello);
     messenger->send(&msg_r2);
     messenger->send(&msg_M1);
     messenger->send(&msg_M2);
@@ -331,7 +336,12 @@ int worker(
     {
         //     If the check succeeds, T_i authenticates the server
         pMutStdout->lock();
-        std::cout << "Tag " << iNodeNum << " success!" << std::endl;
+        std::cout << "Tag " << iNodeNum << "\tsuccess with key y_i= ";
+        for (int i = 0; i < NONCE_LEN * 2; i++)
+        {
+            std::cout << std::bitset<8>(yiNEW[i]) << " ";
+        }
+        std::cout << std::endl;
         pMutStdout->unlock();
         //     and sets:
         //         x_i <- x_i^*,
@@ -346,13 +356,93 @@ int worker(
         std::cout << "Tag " << iNodeNum << " ERROR!" << std::endl;
         pMutStdout->unlock();
     }
-    
 
     ///
     ///--------------------------------------------------------------------------//
     EnterSynchronizationBarrier(pBar, SYNCHRONIZATION_BARRIER_FLAGS_BLOCK_ONLY); // L
     ///--------------------------------------------------------------------------//
     ///
+
+#else // If ADVERSARY defined
+    //Phase 1: The adversary queries a tag T_i as a reader.
+
+    //    1.1 T_i recieves random nonce r_1^' from A.
+    Message msg_1;
+    while (1)
+    {
+        if (messenger->recv(ADDR_ADVERSARY, &msg_1) == 0)
+        {
+            if (msg_1.GetID() == 0)
+            {
+                memcpy(r1_, msg_1.GetData(), NONCE_LEN * 2 * sizeof(uint8_t));
+                break;
+            }
+            else
+            {
+                pMutStdout->lock();
+                std::cout << "Tag " << iNodeNum << " error: wrong msg ID" << std::endl;
+                pMutStdout->unlock();
+            }
+        }
+    }
+
+    //    1.2 T_i generates another random nonce r_2^'
+    for (int i = 0; i < NONCE_LEN; i++)
+    {
+        r2_[i] = prng_next();
+    }
+
+    //        and computes 
+    //            M_1^' = x_i xor h(h(k) xor r_2^'),
+    uint8_t tmp1_[NONCE_LEN * 2];
+    uint8_t tmp1[NONCE_LEN * 2];
+    for (int i = 0; i < NONCE_LEN; i++)
+    {
+        tmp1_[i] = hk[i] ^ r2_[i];
+    }
+    h(tmp1_, tmp1);
+    for (int i = 0; i < NONCE_LEN; i++)
+    {
+        M1_[i] = xi[i] ^ tmp1[i];
+    }
+    //         M_2 = h(y_i xor r_1^' xor r_2^')
+    uint8_t tmp2[NONCE_LEN * 2];
+    for (int i = 0; i < NONCE_LEN * 2; i++)
+    {
+        tmp2[i] = yi[i] ^ r1_[i] ^ r2_[i];
+    }
+    h(tmp2, M2_);
+
+    //    1.3 T_i sends {r_2^', M_1^', M_2^'} to A.
+    Message msg_r2_(iNodeNum, ADDR_ADVERSARY, 1, r2_, NONCE_LEN * 2 * sizeof(uint8_t)); // ID 1
+    Message msg_M1_(iNodeNum, ADDR_ADVERSARY, 2, M1_, NONCE_LEN * 2 * sizeof(uint8_t)); // ID 2
+    Message msg_M2_(iNodeNum, ADDR_ADVERSARY, 3, M2_, NONCE_LEN * 2 * sizeof(uint8_t)); // ID 3
+
+    messenger->send(&msg_r2_);
+    messenger->send(&msg_M1_);
+    messenger->send(&msg_M2_);
+
+    ///    1.4 A computes h(h(k) xor r_2^') and obtains 
+    ///            x_i = M_1^' xor h(h(k) xor r_2^').
+
+    ///    1.5 A keeps {x_i, r_1^', r_2^', M_2^'}.
+
+    ///
+    ///--------------------------------------------------------------------------//
+    EnterSynchronizationBarrier(pBar, SYNCHRONIZATION_BARRIER_FLAGS_BLOCK_ONLY); // 2
+    ///--------------------------------------------------------------------------//
+    ///
+
+
+    ///
+    ///--------------------------------------------------------------------------//
+    EnterSynchronizationBarrier(pBar, SYNCHRONIZATION_BARRIER_FLAGS_BLOCK_ONLY); // LL
+    ///--------------------------------------------------------------------------//
+    ///
+
+#endif
+
+
     return 0;
 }
 

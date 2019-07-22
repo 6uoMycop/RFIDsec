@@ -1,7 +1,7 @@
 #pragma once
 #include <Windows.h>
 
-#define MSG_SIZE 512
+#define MSG_SIZE 1024
 
 // 
 // Class which describes a message

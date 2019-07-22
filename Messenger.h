@@ -7,6 +7,7 @@
 #include <deque>
 #include <mutex>
 #include "Message.h"
+#include "defines.h"
 
 #include <bitset>
 
@@ -59,8 +60,5 @@ private:
     // For communication with reader
     std::list<Message> listReaderMessages; 
     std::mutex         mutReaderMessages;
-
-
-
 };
 
