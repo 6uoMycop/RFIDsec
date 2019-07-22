@@ -5,6 +5,8 @@
 #include <thread>
 #include <mutex>
 #include "Messenger.h"
+#include <bitset>
+#include "defines.h"
 
 //
 // Class which describes RFID-reader

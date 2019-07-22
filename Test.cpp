@@ -1,7 +1,8 @@
 #include "RFIDsecCore.h"
 
-void main()
+int main()
 {
-    RFIDsecCore Core(4);
+    RFIDsecCore Core(20);
     system("pause");
+    return 0;
 }

@@ -38,6 +38,7 @@ public:
 private:
 
     int                       iNodeNumber;                                // Number of this node
+    int                       iNodesQuantity;                             // Number of nodes
     std::thread*              pNodeThread;                                // This node's thread
     char                      cPipeName[64] = "\\\\.\\pipe\\RFIDsecPipe"; // Pipe name in format: \\.\pipe\RFIDsecPipe< Number of this node >
     std::mutex*               mutStdout;                                  // Pointer to mutex for access to console output

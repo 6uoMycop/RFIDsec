@@ -22,10 +22,10 @@ RFIDsecCore::RFIDsecCore(int iNumberOfNodes)
     }
     reader = new Reader(iNumberOfNodes, &mutStdout, &barrier_0);
 
-    for (int i = 0; i < iNumberOfNodes; i++)
-    {
-        vNodes[i].start();
-    }
+    //for (int i = 0; i < iNumberOfNodes; i++)
+    //{
+    //    vNodes[i].start();
+    //}
     reader->start();
 }
 

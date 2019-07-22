@@ -17,12 +17,13 @@ public:
     {
         int  iSender;           // Number of sender node
         int  iReciever;         // Number of reciever node
+        int  iMsgID;            // Message ID
         int  iSize;             // Size of buffer in bytes
         char cBuffer[MSG_SIZE]; // Buffer which contains the message
     };
 
     // 
-    // Empty message
+    // Empty message (ID -1)
     // 
     Message();
 
@@ -32,6 +33,7 @@ public:
     Message(
         int         iSenderNode,   // Number of sender node
         int         iRecieverNode, // Number of reciever node
+        int         iMsgID,        // Message ID
         const void* pData,         // Pointer to data which will be contained in message
         int         iSizeOfData    // Size of buffer in bytes
     );
@@ -59,6 +61,11 @@ public:
     // Get number of this message's reciever node
     //
     int   GetReciever();
+
+    //
+    // Get this message's ID
+    //
+    int   GetID();
 
     //
     // Get size of data (in bytes) which is containing in this message

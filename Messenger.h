@@ -8,7 +8,9 @@
 #include <mutex>
 #include "Message.h"
 
-#define PIPE_BUFFER_SIZE 1024 //
+#include <bitset>
+
+#define PIPE_BUFFER_SIZE 4096 //
 
 #define RECV_MAX_WAIT    10   // Number of waiting iterations
 #define RECV_SLEEP_TIME  100  // ms to sleep during one iteration
@@ -19,10 +21,10 @@
 class Messenger
 {
 public:
-
+    
     Messenger(
-        const char* cPipeName, // Name of listener pipe
-        int         iNodesNum  // Number of nodes
+        char*    cPipeName, // Name of listener pipe
+        int      iNodesNum  // Number of nodes
     );
 
     ~Messenger();
@@ -41,12 +43,14 @@ public:
         int      iFrom, // Sender node's number
         Message* msg    // Message will be stored here
     );
+    
+    char cListenerPipeName[64];
 
 private:
 
     std::thread* pListenerThread; // Listener's thread
     int          iNodesQuantity;  // Number of nodes
-    HANDLE       hPipe;           // Handle of listener pipe
+    //HANDLE       hPipe;           // Handle of listener pipe
 
     // For inter-nodes communication
     std::vector< std::list<Message> > vectRecievedMessages; // Here all recieved messages will be stored until they are processed. A vector's component stands for sender node
@@ -55,5 +59,8 @@ private:
     // For communication with reader
     std::list<Message> listReaderMessages; 
     std::mutex         mutReaderMessages;
+
+
+
 };
 
