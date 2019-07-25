@@ -173,6 +173,8 @@ int adv_worker(
         xi[j] ^= M1_[j];
     }
 
+    std::cout << "xi  " << std::bitset<8>(xi[0]) << " " << std::bitset<8>(xi[1]) << std::endl;
+
     //    1.5 A keeps {x_i, r_1^', r_2^', M_2^'}.
     
 

@@ -19,6 +19,8 @@ RFIDsecCore::RFIDsecCore()
     }
 
 
+    time_t start = clock();
+
     for (int i = 0; i < NODES_QUANTITY; i++)
     {
         Node tmp(i, NODES_QUANTITY, &mutStdout, &barrier_0);
@@ -36,6 +38,16 @@ RFIDsecCore::RFIDsecCore()
     //    vNodes[i].start();
     //}
     reader->start();
+
+    time_t end = clock();
+
+    std::cout << end - start << std::endl;
+
+    FILE* fileRez = NULL;
+    fopen_s(&fileRez, "rez.txt", "a");
+    fprintf(fileRez, "%lli\n", end - start);
+
+
 }
 
 RFIDsecCore::~RFIDsecCore()

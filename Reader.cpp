@@ -248,7 +248,7 @@ int worker(
     SYNCHRONIZATION_BARRIER* pBar
 )
 {
-    prng_init((0xbad ^ 0xc0ffee ^ 42) | 0xcafebabe | 666);
+    prng_init((0xc0ffee ^ 42) | 0xcafebabe | 696);
 
     std::list<int> accepted; // list for checking accepted messages in step 3. When a message accepted, number is erased
 #ifndef ADVERSARY
@@ -320,9 +320,9 @@ int worker(
     messenger->send(&msg_adv_hk);
 #endif
 
-    pMutStdout->lock();
-    std::cout << "Reader: init sent" << std::endl;
-    pMutStdout->unlock();
+    /////pMutStdout->lock();
+    /////std::cout << "Reader: init sent" << std::endl;
+    /////pMutStdout->unlock();
 
     ///
     ///--------------------------------------------------------------------------//
@@ -332,191 +332,206 @@ int worker(
 
 #ifndef ADVERSARY
 
-    // 1.
-    // 1.1 R generates a random nonce r_1
-    for (int i = 0; i < iNodesNumber; i++)
+    for (int k = 0; k < NUM_TESTS; k++)
     {
-        for (int j = 0; j < NONCE_LEN; j++)
+
+        // 1.
+        // 1.1 R generates a random nonce r_1
+        for (int i = 0; i < iNodesNumber; i++)
         {
-            prng_next();
-            vTagData[i].r1[j] = prng_next();
+            for (int j = 0; j < NONCE_LEN; j++)
+            {
+                prng_next();
+                vTagData[i].r1[j] = prng_next();
+            }
         }
-    }
-    //  1.2 R sends r_1 to T_i
-    for(int i = 0; i < iNodesNumber; i++)
-    {
-        Message msg(-1, i, 0, vTagData[i].r1, NONCE_LEN * 2 * sizeof(uint8_t)); // ID 0
-        messenger->send(&msg);
-    }
-
-    ///
-    ///--------------------------------------------------------------------------//
-    EnterSynchronizationBarrier(pBar, SYNCHRONIZATION_BARRIER_FLAGS_BLOCK_ONLY); // 2
-    ///--------------------------------------------------------------------------//
-    ///
-
-    /// 2. T_i generates another random nonce r_2 and computes
-    ///        M_1 = x_i xor h(h(k)) xor r_2),
-    ///        M_2 = h(y_i xor r_1 xor r_2)
-
-    ///
-    ///--------------------------------------------------------------------------//
-    EnterSynchronizationBarrier(pBar, SYNCHRONIZATION_BARRIER_FLAGS_BLOCK_ONLY); // 3
-    ///--------------------------------------------------------------------------//
-    ///
-
-    //  3. R accepts {r_2, M_1, M_2} from T_i
-    while (!accepted.empty())
-    {
-        Message msg;
-        if (messenger->recv(*iter, &msg) == -1) // ID: 1 - r_2, 2 - M_1, 3 - M_2
+        //  1.2 R sends r_1 to T_i
+        for (int i = 0; i < iNodesNumber; i++)
         {
-            continue; // message was not recieved
+            Message msg(-1, i, 0, vTagData[i].r1, NONCE_LEN * 2 * sizeof(uint8_t)); // ID 0
+            messenger->send(&msg);
         }
 
-        // Handling
-        switch (msg.GetID())
+        ///
+        ///--------------------------------------------------------------------------//
+        EnterSynchronizationBarrier(pBar, SYNCHRONIZATION_BARRIER_FLAGS_BLOCK_ONLY); // 2
+        ///--------------------------------------------------------------------------//
+        ///
+
+        /// 2. T_i generates another random nonce r_2 and computes
+        ///        M_1 = x_i xor h(h(k)) xor r_2),
+        ///        M_2 = h(y_i xor r_1 xor r_2)
+
+        ///
+        ///--------------------------------------------------------------------------//
+        EnterSynchronizationBarrier(pBar, SYNCHRONIZATION_BARRIER_FLAGS_BLOCK_ONLY); // 3
+        ///--------------------------------------------------------------------------//
+        ///
+
+        //  3. R accepts {r_2, M_1, M_2} from T_i
+        while (!accepted.empty())
         {
-        case 1:
+            Message msg;
+            if (messenger->recv(*iter, &msg) == -1) // ID: 1 - r_2, 2 - M_1, 3 - M_2
+            {
+                continue; // message was not recieved
+            }
+
+            // Handling
+            switch (msg.GetID())
+            {
+            case 1:
+            {
+                memcpy(vTagData[*iter].r2, msg.GetData(), NONCE_LEN * 2 * sizeof(uint8_t));
+                break;
+            }
+            case 2:
+            {
+                memcpy(vTagData[*iter].M1, msg.GetData(), NONCE_LEN * 2 * sizeof(uint8_t));
+                break;
+            }
+            case 3:
+            {
+                memcpy(vTagData[*iter].M2, msg.GetData(), NONCE_LEN * 2 * sizeof(uint8_t));
+                break;
+            }
+            default:
+            {
+                pMutStdout->lock();
+                printf("ERROR\n");
+                pMutStdout->unlock();
+                return -1;
+            }
+            }
+
+            // Deletion
+            iter = accepted.erase(iter);
+            if (iter == accepted.end())
+            {
+                iter = accepted.begin();
+            }
+        }
+
+        for (int i = 0; i < iNodesNumber; i++)
         {
-            memcpy(vTagData[*iter].r2, msg.GetData(), NONCE_LEN * 2 * sizeof(uint8_t));
-            break;
+            accepted.push_back(i);
+            accepted.push_back(i);
+            accepted.push_back(i);
         }
-        case 2:
+        iter = accepted.begin();
+
+        ///
+        ///--------------------------------------------------------------------------//
+        EnterSynchronizationBarrier(pBar, SYNCHRONIZATION_BARRIER_FLAGS_BLOCK_ONLY); // 4
+        ///--------------------------------------------------------------------------//
+        ///
+
+        //  4. R transmits {r_1, r_2, M_1, M_2} to DB
+        for (int i = 0; i < iNodesNumber; i++)
         {
-            memcpy(vTagData[*iter].M1, msg.GetData(), NONCE_LEN * 2 * sizeof(uint8_t));
-            break;
+            DB.Set_r1(i, vTagData[i].r1);
+            DB.Set_r2(i, vTagData[i].r2);
+            DB.Set_M1(i, vTagData[i].M1);
+            DB.Set_M2(i, vTagData[i].M2);
         }
-        case 3:
+
+        //  4' DB computes 
+        //         x_i = M_1 xor h(h(k) xor r2)
+        for (int i = 0; i < iNodesNumber; i++)
         {
-            memcpy(vTagData[*iter].M2, msg.GetData(), NONCE_LEN * 2 * sizeof(uint8_t));
-            break;
+            DB.Compute_xi(i);
         }
-        default:
+        //     and
+        //         y_i = f_k(x_i).
+        for (int i = 0; i < iNodesNumber; i++)
         {
-            pMutStdout->lock();
-            printf("ERROR\n");
-            pMutStdout->unlock();
-            return -1;
+            DB.Compute_yi(i);
         }
-        }
-        
-        // Deletion
-        iter = accepted.erase(iter);
-        if (iter == accepted.end())
+        //     Then checks whether 
+        //         M_2 = h(y_i xor r1 xor r2).
+        //     If it holds, DB authenticates T_i. 
+        //     Otherwise it sends an error to R and terminates the session.
+        for (int i = 0; i < iNodesNumber; i++)
         {
-            iter = accepted.begin();
+            if (!DB.Check_M2(i))
+            {
+                pMutStdout->lock();
+                std::cout << "Tag " << i << ": DB check M2 error" << std::endl;
+                pMutStdout->unlock();
+            }
         }
-    }
 
-    ///
-    ///--------------------------------------------------------------------------//
-    EnterSynchronizationBarrier(pBar, SYNCHRONIZATION_BARRIER_FLAGS_BLOCK_ONLY); // 4
-    ///--------------------------------------------------------------------------//
-    ///
-
-    //  4. R transmits {r_1, r_2, M_1, M_2} to DB
-    for (int i = 0; i < iNodesNumber; i++)
-    {
-        DB.Set_r1(i, vTagData[i].r1);
-        DB.Set_r2(i, vTagData[i].r2);
-        DB.Set_M1(i, vTagData[i].M1);
-        DB.Set_M2(i, vTagData[i].M2);
-    }
-    
-    //  4' DB computes 
-    //         x_i = M_1 xor h(h(k) xor r2)
-    for (int i = 0; i < iNodesNumber; i++)
-    {
-        DB.Compute_xi(i);
-    }
-    //     and
-    //         y_i = f_k(x_i).
-    for (int i = 0; i < iNodesNumber; i++)
-    {
-        DB.Compute_yi(i);
-    }
-    //     Then checks whether 
-    //         M_2 = h(y_i xor r1 xor r2).
-    //     If it holds, DB authenticates T_i. 
-    //     Otherwise it sends an error to R and terminates the session.
-    for (int i = 0; i < iNodesNumber; i++)
-    {
-        if (!DB.Check_M2(i))
+        //  5. DB computes 
+        //         x_i^* = h(x_i xor y_i xor r_1 xor r_2)
+        for (int i = 0; i < iNodesNumber; i++)
         {
-            pMutStdout->lock();
-            std::cout << "Tag " << i << ": DB check M2 error" << std::endl;
-            pMutStdout->unlock();
+            DB.Compute_xiNEW(i);
         }
+        //     and new key 
+        //         y_i^* = f_k(x_i^*)
+        for (int i = 0; i < iNodesNumber; i++)
+        {
+            DB.Compute_yiNEW(i);
+        }
+
+        //  6. DB calculates 
+        //         M_3 = y_i^* xor h(x_i^* xor y_i),
+        //         M_4 = h(x_i^* xor y_i^*),
+        for (int i = 0; i < iNodesNumber; i++)
+        {
+            DB.Compute_M3(i);
+            DB.Compute_M4(i);
+            //     sends {M_3, M_4} with related data of T_i to R 
+            DB.Get_M3(i, vTagData[i].M3);
+            DB.Get_M4(i, vTagData[i].M4);
+        }
+        //     and sets
+        //         y_i^{old} <- y_i, 
+        //         y_i       <- y_i^*
+        // AND NEW x_i
+        for (int i = 0; i < iNodesNumber; i++)
+        {
+            DB.Set_new_yi(i);
+            DB.Set_new_xi(i);
+        }
+
+        ///
+        ///--------------------------------------------------------------------------//
+        EnterSynchronizationBarrier(pBar, SYNCHRONIZATION_BARRIER_FLAGS_BLOCK_ONLY); // 7
+        ///--------------------------------------------------------------------------//
+        ///
+
+        //  7. R forwards M_3, M_4 to T_i
+        for (int i = 0; i < iNodesNumber; i++)
+        {
+            ////char cHello[] = "Hello";
+            ////Message hello(-1, i, -100, cHello, strlen(cHello));
+            ////messenger->send(&hello);
+
+            Message msg1(-1, i, 4, vTagData[i].M3, NONCE_LEN * 2 * sizeof(uint8_t)); // ID 4
+            Message msg2(-1, i, 5, vTagData[i].M4, NONCE_LEN * 2 * sizeof(uint8_t)); // ID 5
+            messenger->send(&msg1);
+            messenger->send(&msg2);
+        }
+
+        /// 8. T_i calculates 
+        ///        x_i^* = h(x_i xor y^i xor r_1 xor r_2)
+        ///    and obtains
+        ///        y_i^* = M_3 xor h(x_i^* xor y_i). 
+        ///    After, it checks whether
+        ///        M_4 = h(x_i xor y_i). 
+        ///    If the check succeeds, T_i authenticates the server and sets:
+        ///        x_i <- x_i^*,
+        ///        y_i <- y_i^*. 
+        ///    Otherwise, it keeps x_i, y_i unchanged.
+
+        ///
+        ///--------------------------------------------------------------------------//
+        EnterSynchronizationBarrier(pBar, SYNCHRONIZATION_BARRIER_FLAGS_BLOCK_ONLY); // L
+        ///--------------------------------------------------------------------------//
+        ///
+
     }
-
-    //  5. DB computes 
-    //         x_i^* = h(x_i xor y_i xor r_1 xor r_2)
-    for (int i = 0; i < iNodesNumber; i++)
-    {
-        DB.Compute_xiNEW(i);
-    }
-    //     and new key 
-    //         y_i^* = f_k(x_i^*)
-    for (int i = 0; i < iNodesNumber; i++)
-    {
-        DB.Compute_yiNEW(i);
-    }
-
-    //  6. DB calculates 
-    //         M_3 = y_i^* xor h(x_i^* xor y_i),
-    //         M_4 = h(x_i^* xor y_i^*),
-    for (int i = 0; i < iNodesNumber; i++)
-    {
-        DB.Compute_M3(i);
-        DB.Compute_M4(i);
-    //     sends {M_3, M_4} with related data of T_i to R 
-        DB.Get_M3(i, vTagData[i].M3);
-        DB.Get_M4(i, vTagData[i].M4);
-    }
-    //     and sets
-    //         y_i^{old} <- y_i, 
-    //         y_i       <- y_i^*
-    for (int i = 0; i < iNodesNumber; i++)
-    {
-        DB.Set_new_yi(i);
-    }
-
-    ///
-    ///--------------------------------------------------------------------------//
-    EnterSynchronizationBarrier(pBar, SYNCHRONIZATION_BARRIER_FLAGS_BLOCK_ONLY); // 7
-    ///--------------------------------------------------------------------------//
-    ///
-
-    //  7. R forwards M_3, M_4 to T_i
-    for (int i = 0; i < iNodesNumber; i++)
-    {
-        ////char cHello[] = "Hello";
-        ////Message hello(-1, i, -100, cHello, strlen(cHello));
-        ////messenger->send(&hello);
-
-        Message msg1(-1, i, 4, vTagData[i].M3, NONCE_LEN * 2 * sizeof(uint8_t)); // ID 4
-        Message msg2(-1, i, 5, vTagData[i].M4, NONCE_LEN * 2 * sizeof(uint8_t)); // ID 5
-        messenger->send(&msg1);
-        messenger->send(&msg2);
-    }
-
-    /// 8. T_i calculates 
-    ///        x_i^* = h(x_i xor y^i xor r_1 xor r_2)
-    ///    and obtains
-    ///        y_i^* = M_3 xor h(x_i^* xor y_i). 
-    ///    After, it checks whether
-    ///        M_4 = h(x_i xor y_i). 
-    ///    If the check succeeds, T_i authenticates the server and sets:
-    ///        x_i <- x_i^*,
-    ///        y_i <- y_i^*. 
-    ///    Otherwise, it keeps x_i, y_i unchanged.
-
-    ///
-    ///--------------------------------------------------------------------------//
-    EnterSynchronizationBarrier(pBar, SYNCHRONIZATION_BARRIER_FLAGS_BLOCK_ONLY); // L
-    ///--------------------------------------------------------------------------//
-    ///
 
 #else // If ADVERSARY defined
     uint8_t adv_r1[NONCE_LEN * 2];
@@ -625,9 +640,9 @@ int worker(
 
 #endif
 
-    pMutStdout->lock();
-    std::cout << "Reader off" << std::endl;
-    pMutStdout->unlock();
+    ///pMutStdout->lock();
+    ///std::cout << "Reader off" << std::endl;
+    ///pMutStdout->unlock();
 
     return 0;
 

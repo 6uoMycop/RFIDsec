@@ -13,10 +13,13 @@ public:
     {
         uint8_t xi[NONCE_LEN * 2]    = { 0 };
         uint8_t yi[NONCE_LEN * 2]    = { 0 };
+        bool xi_set = false;
+        bool yi_set = false;
 
         uint8_t xiNEW[NONCE_LEN * 2] = { 0 };
         uint8_t yiNEW[NONCE_LEN * 2] = { 0 };
 
+        uint8_t xiOLD[NONCE_LEN * 2] = { 0 };
         uint8_t yiOLD[NONCE_LEN * 2] = { 0 };
 
         //
@@ -41,6 +44,7 @@ public:
     void Set_r2(int iTagNum, uint8_t* r2);
     void Set_M1(int iTagNum, uint8_t* M1);
     void Set_M2(int iTagNum, uint8_t* M2);
+    void Set_new_xi(int iTagNum);
     void Set_new_yi(int iTagNum);
 
     void Compute_xi(int iTagNum);

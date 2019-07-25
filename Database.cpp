@@ -50,7 +50,7 @@ static void prng_init(uint32_t seed)
 
 Database::Database(int iNodesQuantity)
 {
-    prng_init((0xbad ^ 0xc0ffee ^ 42) | 0xcafebabe ^ 666 ^ 92);
+    prng_init((0xbad ^ 42) | 0xcafebabe ^ 666 ^ 92);
 
     for (int i = 0; i < NONCE_LEN; i++)
     {
@@ -125,6 +125,12 @@ void Database::Set_M2(int iTagNum, uint8_t* M2)
     memcpy(vData[iTagNum].M2, M2, NONCE_LEN * 2 * sizeof uint8_t);
 }
 
+void Database::Set_new_xi(int iTagNum)
+{
+    memcpy(vData[iTagNum].xiOLD, vData[iTagNum].xi,    NONCE_LEN * 2 * sizeof(uint8_t));
+    memcpy(vData[iTagNum].xi,    vData[iTagNum].xiNEW, NONCE_LEN * 2 * sizeof(uint8_t));
+}
+
 void Database::Set_new_yi(int iTagNum)
 {
     memcpy(vData[iTagNum].yiOLD, vData[iTagNum].yi,    NONCE_LEN * 2 * sizeof(uint8_t));
@@ -133,27 +139,52 @@ void Database::Set_new_yi(int iTagNum)
 
 void Database::Compute_xi(int iTagNum)
 {
-    uint8_t in[NONCE_LEN * 2];
-    for (int j = 0; j < NONCE_LEN * 2; j++)
+    if (!vData[iTagNum].xi_set)
     {
-        in[j] = hk[j] ^ vData[iTagNum].r2[j];
-    }
-    h(in, vData[iTagNum].xi);
-    for (int j = 0; j < NONCE_LEN * 2; j++)
-    {
-        vData[iTagNum].xi[j] ^= vData[iTagNum].M1[j];
+        uint8_t in[NONCE_LEN * 2];
+        for (int j = 0; j < NONCE_LEN * 2; j++)
+        {
+            in[j] = hk[j] ^ vData[iTagNum].r2[j];
+        }
+        h(in, vData[iTagNum].xi);
+        for (int j = 0; j < NONCE_LEN * 2; j++)
+        {
+            vData[iTagNum].xi[j] ^= vData[iTagNum].M1[j];
+        }
+
+#ifdef ADVERSARY
+        std::cout << "DB xi  " << std::bitset<8>(vData[iTagNum].xi[0]) << " " << std::bitset<8>(vData[iTagNum].xi[1]) << std::endl;
+#endif // ADVERSARY
+
+
+        vData[iTagNum].xi_set = true;
     }
 }
 
 void Database::Compute_yi(int iTagNum)
 {
-    f(k, vData[iTagNum].xi, vData[iTagNum].yi);
+    if (!vData[iTagNum].yi_set)
+    {
+        f(k, vData[iTagNum].xi, vData[iTagNum].yi);
+
+#ifdef ADVERSARY
+        std::cout << "DB yi  " << std::bitset<8>(vData[iTagNum].yi[0]) << " " << std::bitset<8>(vData[iTagNum].yi[1]) << std::endl;
+#endif // ADVERSARY
+
+        vData[iTagNum].yi_set = true;
+    }
 }
 
 bool Database::Check_M2(int iTagNum)
 {
     uint8_t in[NONCE_LEN * 2];
     uint8_t rez[NONCE_LEN * 2];
+
+    
+    /////std::cout << "r1= " << std::bitset<8>(vData[iTagNum].r1[0]) << " " << std::bitset<8>(vData[iTagNum].r1[1]) << std::endl
+    /////          << "r2= " << std::bitset<8>(vData[iTagNum].r2[0]) << " " << std::bitset<8>(vData[iTagNum].r2[1]) << std::endl
+    /////          << "yi= " << std::bitset<8>(vData[iTagNum].yi[0]) << " " << std::bitset<8>(vData[iTagNum].yi[1]) << std::endl
+    /////          << "M2= " << std::bitset<8>(vData[iTagNum].M2[0]) << " " << std::bitset<8>(vData[iTagNum].M2[1]) << std::endl;
 
     for (int j = 0; j < NONCE_LEN * 2; j++)
     {
@@ -179,6 +210,12 @@ void Database::Compute_xiNEW(int iTagNum)
         in[j] = vData[iTagNum].xi[j] ^ vData[iTagNum].yi[j] ^ vData[iTagNum].r1[j] ^ vData[iTagNum].r2[j];
     }
     h(in, vData[iTagNum].xiNEW);
+
+    /////std::cout << "DB r1 = " << std::bitset<8>(vData[iTagNum].r1[0])    << " " << std::bitset<8>(vData[iTagNum].r1[1])    << std::endl
+    /////          << "DB r2 = " << std::bitset<8>(vData[iTagNum].r2[0])    << " " << std::bitset<8>(vData[iTagNum].r2[1])    << std::endl
+    /////          << "DB xi = " << std::bitset<8>(vData[iTagNum].xi[0])    << " " << std::bitset<8>(vData[iTagNum].xi[1])    << std::endl
+    /////          << "DB yi = " << std::bitset<8>(vData[iTagNum].yi[0])    << " " << std::bitset<8>(vData[iTagNum].yi[1])    << std::endl
+    /////          << "DB xi*= " << std::bitset<8>(vData[iTagNum].xiNEW[0]) << " " << std::bitset<8>(vData[iTagNum].xiNEW[1]) << std::endl;
 }
 
 void Database::Compute_yiNEW(int iTagNum)

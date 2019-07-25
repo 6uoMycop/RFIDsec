@@ -51,7 +51,6 @@ private:
 
     std::thread* pListenerThread; // Listener's thread
     int          iNodesQuantity;  // Number of nodes
-    //HANDLE       hPipe;           // Handle of listener pipe
 
     // For inter-nodes communication
     std::vector< std::list<Message> > vectRecievedMessages; // Here all recieved messages will be stored until they are processed. A vector's component stands for sender node
